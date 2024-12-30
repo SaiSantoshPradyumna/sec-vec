@@ -1,5 +1,3 @@
-This si CHATGPT generated code
-
 from confluent_kafka import Producer, Consumer, KafkaError
 
 # Kafka configuration
