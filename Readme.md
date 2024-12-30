@@ -53,8 +53,6 @@ The project uses the following tools and technologies:
   - A running **Kafka broker**.
   - A **PostgreSQL** database server with access credentials.
 
-Apologies for the confusion earlier! Here's the corrected format for your project structure to add to your `README.md` file:
-
 
 ## Project Structure
 
