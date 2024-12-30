@@ -39,11 +39,11 @@ This project simulates a pipeline for generating, processing, and storing car ev
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/SaiSantoshPradyumna/sec-vec
    ```
 2. Navigate to the project directory:
    ```bash
-   cd <project-directory>
+   cd sec-vec
    ```
 3. Install any required dependencies (none for the current implementation).
 
@@ -51,7 +51,7 @@ This project simulates a pipeline for generating, processing, and storing car ev
 
 1. Run the script:
    ```bash
-   python <script-name>.py
+   python app.py
    ```
 2. The program will generate random events and print them to the console in real-time.
 
