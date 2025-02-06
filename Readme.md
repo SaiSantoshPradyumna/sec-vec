@@ -107,7 +107,7 @@ This below are the steps you executed and explains the purpose and reasoning beh
 ### 4. Starting Kafka Broker
 
 ```powershell
-& "C:\kafka\bin\windows\kafka-server-start.bat" "C:\kafka\config\kraft\broker.properties"
+& "C:\kafka\bin\windows\kafka-server-start.bat" "C:\kafka\config\kraft\server.properties"
 ```
 
 ## Summary
