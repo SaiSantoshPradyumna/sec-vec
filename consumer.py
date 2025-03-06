@@ -1,105 +1,58 @@
 import os
-from dotenv import load_dotenv
 import json
 import base64
 import psycopg2
 from psycopg2 import sql
 from datetime import datetime
-from confluent_kafka import Consumer, KafkaException
-from cryptography.hazmat.primitives import hashes, padding
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from confluent_kafka import Consumer,KafkaException
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.primitives.ciphers import Cipher,algorithms,modes
 from cryptography.hazmat.backends import default_backend
 
-# Load environmet variabless
-load_dotenv()
+db_config={"host":os.getenv("DB_HOST"),"database":os.getenv("DB_NAME"),"user":os.getenv("DB_USER"),"password":os.getenv("DB_PASSWORD")}
+kafka_conf={"bootstrap.servers":"localhost:9092","group.id":"car_event_consumers","auto.offset.reset":"earliest"}
+consumer=Consumer(kafka_conf)
+consumer.subscribe(["car_events"])
+AES_KEY=base64.b64decode(os.getenv("AES_KEY"))
+AES_IV=base64.b64decode(os.getenv("AES_IV"))
 
-# Database Configuraton
-# This dictonary contains the databse host, name, user, and password fetched from environment variables.
-db_config = {
-    'host': os.getenv('DB_HOST'),
-    'database': os.getenv('DB_NAME'),
-    'user': os.getenv('DB_USER'),
-    'password': os.getenv('DB_PASSWORD')
-}
+def decrypt_message(m,k,i):
+    c=Cipher(algorithms.AES(k),modes.CBC(i),backend=default_backend()).decryptor()
+    d=c.update(m)+c.finalize()
+    u=padding.PKCS7(128).unpadder()
+    return (u.update(d)+u.finalize()).decode()
 
-# Kafka Configurattion
-# Kafka consumer configuration includess bootstrap server, group id and offset reset.
-kafka_conf = {
-    'bootstrap.servers': 'localhost:9092',
-    'group.id': 'car_event_consumers',
-    'auto.offset.reset': 'earliest'
-}
-
-# Initialize the Kafka consumer and subscribe to the "car_events" topic
-consumer = Consumer(kafka_conf)
-consumer.subscribe(['car_events'])
-
-# AES Key and IV Setup
-# The AES Key and IV are used to decrypt the incomming messages.
-AES_KEY = b'\x00' * 32
-AES_IV = b'\x00' * 16
-
-# Decrypts encrypted messages using AES CBC mode
-# This functon decrypts a given encrypted message and removes paddding.
-def decrypt_message(encrypted_message, key, iv):
-    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-    decryptor = cipher.decryptor()
-    decrypted_padded = decryptor.update(encrypted_message) + decryptor.finalize()
-    unpadder = padding.PKCS7(128).unpadder()
-    decrypted = unpadder.update(decrypted_padded) + unpadder.finalize()
-    return decrypted.decode()
-
-# Store the event into the databse
-# This function stores the event data into a PostgreSQL databse after ensuring the table exists.
-def store_event(event_data):
+def store_event(d):
+    conn=None
     try:
-        conn = psycopg2.connect(**db_config)
-        cursor = conn.cursor()
-        create_table_query = '''
-            CREATE TABLE IF NOT EXISTS car_event_logs (
-                id SERIAL PRIMARY KEY,
-                event VARCHAR(50),
-                timestamp TIMESTAMP
-            );
-        '''
-        cursor.execute(create_table_query)
-        insert_query = '''
-            INSERT INTO car_event_logs (event, timestamp)
-            VALUES (%s, %s);
-        '''
-        cursor.execute(insert_query, (event_data['event'], event_data['timestamp']))
+        conn=psycopg2.connect(**db_config)
+        cur=conn.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS car_event_logs (id SERIAL PRIMARY KEY, event VARCHAR(50), timestamp TIMESTAMP)")
+        cur.execute("INSERT INTO car_event_logs (event,timestamp) VALUES (%s,%s)",(d["event"],d["timestamp"]))
         conn.commit()
-
-        # Formatt the timestamp before printing
-        formatted_timestamp = datetime.fromisoformat(event_data['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
-        print(f"Stored event: {event_data['event']} at {formatted_timestamp}")
-    except (Exception, psycopg2.DatabaseError) as error:
-        print(f"Error while storing event: {error}")
+        ft=datetime.fromisoformat(d["timestamp"]).strftime("%Y-%m-%d %H:%M:%S")
+        print(f"Stored event: {d['event']} at {ft}")
+    except Exception as e:
+        print(f"Error: {e}")
     finally:
         if conn:
-            cursor.close()
+            cur.close()
             conn.close()
 
-# Consume Kafka events and process them
-# This function polls the Kafka topic for messages, decrypts them, and stores them in the database.
 def consume_events():
     try:
         while True:
-            msg = consumer.poll(1.0)
+            msg=consumer.poll(1.0)
             if msg is None:
                 continue
             if msg.error():
                 raise KafkaException(msg.error())
-            encrypted_message = base64.b64decode(msg.value())
-            decrypted_message = decrypt_message(encrypted_message, AES_KEY, AES_IV)
-            event_data = json.loads(decrypted_message)
-            store_event(event_data)
+            dm=decrypt_message(base64.b64decode(msg.value()),AES_KEY,AES_IV)
+            store_event(json.loads(dm))
     except KeyboardInterrupt:
-        print("Event consumption stopped.")
+        print("Stopped")
     finally:
         consumer.close()
 
-# Main entry point for the consumer script
-# This ensures the consume_events functin is called when the script is run directly.
-if __name__ == "__main__":
+if __name__=="__main__":
     consume_events()
