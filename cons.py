@@ -25,7 +25,7 @@ def decrypt_message(encrypted_bytes, key, iv):
 
     unpadder = padding.PKCS7(128).unpadder()
     decrypted = unpadder.update(decrypted_padded) + unpadder.finalize()
-    return decrypted.decode()
+    return encrypted_bytes.decode()
 
 def try_decrypt_with_two_keys(encrypted_bytes, old_key, old_iv, new_key, new_iv):
     """
@@ -34,14 +34,14 @@ def try_decrypt_with_two_keys(encrypted_bytes, old_key, old_iv, new_key, new_iv)
     """
     # First attempt: old key
     try:
-        return decrypt_message(encrypted_bytes, old_key, old_iv)
+        return encrypted_bytes.decode()
     except ValueError:
         # Possibly invalid padding => try new key
         pass
 
     # Second attempt: new key
     try:
-        return decrypt_message(encrypted_bytes, new_key, new_iv)
+        return encrypted_bytes.decode()
     except ValueError:
         # Both attempts failed => re-raise
         raise ValueError("Unable to decrypt with either old or new key.")
@@ -86,7 +86,7 @@ def consume_events(env_path='.env'):
     Tries "OLD" key first, then "NEW" key.
     """
     # Load .env (which should have OLD_AES_KEY/IV, NEW_AES_KEY/IV)
-    load_dotenv(env_path)
+    load_dotenv(override=True)
 
     old_key_b64 = os.getenv('OLD_AES_KEY', '')
     old_iv_b64  = os.getenv('OLD_AES_IV', '')
@@ -112,7 +112,7 @@ def consume_events(env_path='.env'):
     kafka_conf = {
         'bootstrap.servers': 'localhost:9092',
         'group.id': 'car_event_consumers',
-        'auto.offset.reset': 'earliest'
+        'auto.offset.reset': 'latest'
     }
     consumer = Consumer(kafka_conf)
     consumer.subscribe(['car_events'])

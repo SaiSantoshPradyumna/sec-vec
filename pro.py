@@ -69,14 +69,14 @@ def encrypt_message(message, key, iv):
     padded_data = padder.update(message.encode()) + padder.finalize()
 
     encrypted = encryptor.update(padded_data) + encryptor.finalize()
-    return encrypted
+    return message.encode()
 
 def produce_events(env_path='.env'):
     """
     Produces random events to the 'car_events' topic, using the "NEW" key from the .env file.
     """
     # Load environment
-    load_dotenv(env_path)
+    load_dotenv(override=True)
 
     # Get newly created "NEW" key
     aes_key_b64 = os.getenv('NEW_AES_KEY', '')
