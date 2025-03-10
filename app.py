@@ -1,69 +1,28 @@
-from confluent_kafka import Producer, Consumer, KafkaError
+import psutil
+import subprocess
+import time
 
-# Kafka configuration
-BROKER = "localhost:9092"  # Change this to your Kafka broker address
-TOPIC = "test-topic"       # Replace with your desired topic name
+def kill_process_using_file(filepath):
+    for proc in psutil.process_iter(['pid', 'name', 'open_files']):
+        try:
+            for file in proc.info['open_files'] or []:
+                if file.path == filepath:
+                    proc.kill()
+                    time.sleep(1)  # Wait for process to be terminated
+                    return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+    return False
 
-# Function to produce messages
-def produce_messages():
-    conf = {'bootstrap.servers': BROKER}
-    producer = Producer(conf)
+def delete_folder(folder_path):
+    subprocess.run(['rd', '/s', '/q', folder_path], shell=True)
+command = r'C:\kafka\bin\windows\kafka-storage.bat format -t FHNx76HFRlKLH1kLfJUO1g -c C:\kafka\config\kraft\server.properties'
 
-    def delivery_report(err, msg):
-        """Callback for message delivery confirmation."""
-        if err:
-            print(f"Delivery failed: {err}")
-        else:
-            print(f"Message delivered to {msg.topic()} [{msg.partition()}]")
+folder_path = r'C:\kafka\kraft-combined-logs'
+kill_process_using_file(folder_path)
+delete_folder(folder_path)
+subprocess.run(command, shell=True)
 
-    # Producing 10 test messages
-    for i in range(10):
-        message = f"Message {i}"
-        producer.produce(TOPIC, value=message, callback=delivery_report)
-        producer.flush()  # Ensure the message is sent to Kafka
-
-    print("All messages sent!")
-
-# Function to consume messages
-def consume_messages():
-    conf = {
-        'bootstrap.servers': BROKER,
-        'group.id': 'my-group',          # Consumer group ID
-        'auto.offset.reset': 'earliest'  # Start consuming from the earliest message
-    }
-    consumer = Consumer(conf)
-    consumer.subscribe([TOPIC])
-
-    print("Consuming messages...")
-    try:
-        while True:
-            msg = consumer.poll(timeout=1.0)  # Wait for a message
-            if msg is None:
-                continue
-            if msg.error():
-                if msg.error().code() == KafkaError._PARTITION_EOF:
-                    # End of partition event
-                    print(f"End of partition: {msg.topic()} [{msg.partition()}]")
-                elif msg.error():
-                    print(f"Error: {msg.error()}")
-                    break
-            else:
-                # Successfully received a message
-                print(f"Received message: {msg.value().decode('utf-8')} from {msg.topic()} [{msg.partition()}]")
-
-    except KeyboardInterrupt:
-        print("Exiting...")
-    finally:
-        consumer.close()
-
-if __name__ == "__main__":
-    print("1. Produce messages")
-    print("2. Consume messages")
-    choice = input("Enter choice (1 or 2): ")
-
-    if choice == "1":
-        produce_messages()
-    elif choice == "2":
-        consume_messages()
-    else:
-        print("Invalid choice!")
+# EVENTS = <script>alert("XSS")</script>
+# EVENTS=Speeding"); DROP TABLE car_event_logs; --,Engine On,Low tire pressure
+# SELECT * FROM car_event_logs ORDER BY timestamp DESC;
